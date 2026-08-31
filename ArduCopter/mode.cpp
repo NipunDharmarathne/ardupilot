@@ -185,6 +185,10 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+        case Mode::Number::QRBOTS_RTL:
+            ret = &mode_qrbots_rtl;
+            break;
+
         default:
             break;
     }

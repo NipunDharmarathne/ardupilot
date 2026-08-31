@@ -243,6 +243,8 @@ public:
     friend class ModeDroneShow;
 #endif
 
+    friend class ModeQRBotsRTL; // <-- Add your mode here
+    
     friend class _AutoTakeoff;
 
     friend class PayloadPlace;
@@ -1113,6 +1115,8 @@ private:
 #if MODE_DRONE_SHOW_ENABLED
     ModeDroneShow mode_drone_show;
 #endif
+
+    ModeQRBotsRTL mode_qrbots_rtl;
 
     // mode.cpp
     Mode *mode_from_mode_num(const Mode::Number mode);

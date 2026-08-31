@@ -100,6 +100,7 @@ public:
         AUTOROTATE =   26,  // Autonomous autorotation
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
+        QRBOTS_RTL =   29,  // Custom time-based trajectory RTL
 
         // Mode number 127 reserved for the "drone show mode" in the Skybrush
         // fork at https://github.com/skybrush-io/ardupilot
@@ -2072,3 +2073,5 @@ private:
 #if MODE_DRONE_SHOW_ENABLED
  # include "mode_drone_show.h"
 #endif
+
+#include "mode_qrbots_rtl.h"
