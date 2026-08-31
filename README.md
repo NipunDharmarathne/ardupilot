@@ -1,3 +1,22 @@
+# How to setup
+
+Fork the repo:
+git clone https://github.com/NipunDharmarathne/ardupilot.git
+
+Run in WSL terminal:
+cd ardupilot
+git checkout CMCopter-4.6
+git submodule sync
+git submodule update --init --recursive --force
+
+# How to build SITL
+
+Run in WSL terminal:
+./waf clean
+./waf configure --board sitl
+./waf copter
+
+
 # ArduPilot Project
 
 <a href="https://ardupilot.org/discord"><img src="https://img.shields.io/discord/674039678562861068.svg" alt="Discord">
