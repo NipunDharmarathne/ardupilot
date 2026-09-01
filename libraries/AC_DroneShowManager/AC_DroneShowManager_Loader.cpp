@@ -193,6 +193,35 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
                 _trajectory_stats.takeoff_time_sec, 
                 _trajectory_stats.landing_time_sec
             );
+
+            // ====================================================================
+            // QRBOTS DEBUG TO GCS & CONSOLE
+            // ====================================================================
+            sb_screenplay_scene_t* first_scene = sb_screenplay_get_scene_ptr(&_screenplay, 0);
+            if (first_scene != nullptr) {
+                // 1. Send a short summary to Mission Planner / MAVProxy
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "QRBots Plan Loaded! Scale: %.1f, Entries: %u", 
+                              (double)first_scene->qrbots_rth_plan.scale, 
+                              (unsigned int)first_scene->qrbots_rth_plan.num_entries);
+
+                // 2. Print every single entry to the background SITL console
+                hal.console->printf("\n=== QRBOTS RTH PLAN ENTRIES ===\n");
+                for (size_t i = 0; i < first_scene->qrbots_rth_plan.num_entries; i++) {
+                    const auto& entry = first_scene->qrbots_rth_plan.entries[i];
+                    
+                    // Note: These are the RAW scaled values. 
+                    // To get true meters, you would multiply by scale and divide by 1000.
+                    hal.console->printf(" [%02u] Time: %lu ms | X: %d, Y: %d, Z: %d | Vel: %u cm/s\n",
+                                        (unsigned int)i,
+                                        (unsigned long)entry.time_ms,
+                                        (int)entry.x,
+                                        (int)entry.y,
+                                        (int)entry.z,
+                                        (unsigned int)entry.v_cm_s);
+                }
+                hal.console->printf("===============================\n\n");
+            }
+            // ====================================================================     
         }
     }
     else

@@ -17,6 +17,8 @@ Run in WSL terminal:
 ./waf copter
 
 # How to run SITL
+Rub this in another WSL terminal:
+python3 -c "import socket, time; s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.bind(('127.0.0.1', 14555)); print('Port 14555 open. Leave this running.'); time.sleep(999999)"
 
 From ardupilot:
 ./Tools/autotest/sim_vehicle.py -v ArduCopter -f quad --map --console
