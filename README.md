@@ -16,6 +16,17 @@ Run in WSL terminal:
 ./waf configure --board sitl
 ./waf copter
 
+# How to run SITL
+
+From ardupilot:
+./Tools/autotest/sim_vehicle.py -v ArduCopter -f quad --map --console
+
+mode GUIDED
+arm throttle
+takeoff 10
+
+
+Can run multiple from skybrush ap-swarm-launch
 
 # ArduPilot Project
 
