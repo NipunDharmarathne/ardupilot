@@ -805,6 +805,13 @@ void AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_coordinat
 }
 
 bool AC_DroneShowManager::get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_m, float &vel_m_s) const {
+    gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: Plan holds %u points", 
+                    (unsigned int)_main_show_scene.qrbots_rth_plan.num_entries);
+
+
+    // Basic debug to show we entered the function
+    gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: Requesting target for %u ms", time_ms);
+
     sb_vector3_t sb_pos;
     if (sb_qrbots_rth_plan_get_target_at(&_main_show_scene.qrbots_rth_plan, time_ms, &sb_pos, &vel_m_s)) {
         pos_m.x = sb_pos.x;
@@ -812,5 +819,8 @@ bool AC_DroneShowManager::get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_
         pos_m.z = sb_pos.z;
         return true;
     }
+    
+    // This proves the C function is actively rejecting the time_ms
+    gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: sb_ function returned false");
     return false;
 }

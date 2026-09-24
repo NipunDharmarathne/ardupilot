@@ -14,11 +14,11 @@ bool ModeQRBotsRTL::init(bool ignore_checks)
     // Initialize waypoint navigation (automatically sets destination to current position to stop/loiter)
     wp_nav->wp_and_spline_init();
     
-    // Start the 30-second timer and set state
+    // Start the 5-second timer and set state
     _wait_start_ms = AP_HAL::millis();
-    _state = State::WAITING_30S;
+    _state = State::WAITING_5S; 
     
-    gcs().send_text(MAV_SEVERITY_INFO, "QRBots RTL: Loitering for 30s...");
+    gcs().send_text(MAV_SEVERITY_INFO, "QRBots RTL: Loitering for 5s...");
     return true;
 }
 
@@ -26,17 +26,23 @@ void ModeQRBotsRTL::run()
 {
     // Transition to LAND mode
     if (_state == State::EXECUTE_LAND) {
-        copter.set_mode(Mode::Number::LAND, ModeReason::UNKNOWN);
-        return;
+        if (copter.set_mode(Mode::Number::LAND, ModeReason::UNKNOWN)) {
+            // Hand off execution to LAND mode for this exact loop tick
+            // to satisfy ArduPilot's flow-of-control checks.
+            copter.flightmode->run();
+            return;
+        }
+        // If the mode switch fails for any reason, do NOT return. 
+        // Fall through so the drone continues to loiter safely instead of dropping.
     }
 
     // Ensure motors are running at full flight authority
     motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
     // --- State Machine ---
-    if (_state == State::WAITING_30S) {
-        // Wait until 30,000 milliseconds (30s) have passed since mode init
-        if (AP_HAL::millis() - _wait_start_ms >= 30000) {
+    if (_state == State::WAITING_5S) {
+        // Wait until 5,000 milliseconds (5s) have passed since mode init
+        if (AP_HAL::millis() - _wait_start_ms >= 5000) {
             
             Vector3f target_pos_m;
             float target_vel_ms;

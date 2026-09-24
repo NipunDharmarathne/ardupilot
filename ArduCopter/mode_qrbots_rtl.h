@@ -18,7 +18,7 @@ public:
 
 private:
     enum class State {
-        WAITING_30S,
+        WAITING_5S,
         FLY_TO_TARGET,
         EXECUTE_LAND
     };
