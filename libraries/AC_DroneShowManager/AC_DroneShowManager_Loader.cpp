@@ -218,6 +218,12 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
                                         (int)entry.y,
                                         (int)entry.z,
                                         (unsigned int)entry.v_cm_s);
+                                        
+                    // Yield every 10 lines to allow the serial ring buffer to drain
+                    // This prevents the buffer overrun on large files.
+                    if ((i % 10) == 0) {
+                        hal.scheduler->delay(2);
+                    }
                 }
                 hal.console->printf("===============================\n\n");
             }
