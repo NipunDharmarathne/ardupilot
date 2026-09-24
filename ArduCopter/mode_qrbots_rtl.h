@@ -18,16 +18,11 @@ public:
 
 private:
     enum class State {
+        WAITING_30S,
         FLY_TO_TARGET,
         EXECUTE_LAND
     };
 
     State _state;
-
-    // --- DEFINED TARGET SETTINGS ---
-    // Target X, Y, Z in cm relative to home (e.g., 1000cm = 10 meters)
-    const Vector3f _target_pos_cm = Vector3f(1500, 1500, 500); 
-    
-    // Target velocity in cm/s (e.g., 300cm/s = 3 m/s)
-    const float _target_velocity_cms = 300; 
+    uint32_t _wait_start_ms;
 };

@@ -803,3 +803,14 @@ void AC_DroneShowManager::ShowCoordinateSystem::convert_show_to_global_coordinat
 
     loc.offset(offset_north, offset_east);
 }
+
+bool AC_DroneShowManager::get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_m, float &vel_m_s) const {
+    sb_vector3_t sb_pos;
+    if (sb_qrbots_rth_plan_get_target_at(&_main_show_scene.qrbots_rth_plan, time_ms, &sb_pos, &vel_m_s)) {
+        pos_m.x = sb_pos.x;
+        pos_m.y = sb_pos.y;
+        pos_m.z = sb_pos.z;
+        return true;
+    }
+    return false;
+}

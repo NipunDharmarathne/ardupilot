@@ -573,6 +573,9 @@ public:
     // value of MOT_SPOOL_TIME seems invalid
     static constexpr float DEFAULT_MOTOR_SPOOL_UP_TIME_SEC = 0.5f;
 
+    // Fetch the QRBots target for a specific time in milliseconds
+    bool get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_m, float &vel_m_s) const;
+
 private:
     // Structure holding all the parameters settable by the user
     struct {
