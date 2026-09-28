@@ -576,6 +576,9 @@ public:
     // Fetch the QRBots target for a specific time in milliseconds
     bool get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_m, float &vel_m_s) const;
 
+    /// Converts a 3D position vector in show coordinates (meters) to a global GPS Location
+    bool convert_show_pos_to_location(const Vector3f &pos_m, Location &loc) const;
+    
 private:
     // Structure holding all the parameters settable by the user
     struct {

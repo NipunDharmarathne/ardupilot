@@ -824,3 +824,22 @@ bool AC_DroneShowManager::get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_
     gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: sb_ function returned false");
     return false;
 }
+
+
+
+/// Converts a 3D position vector in show coordinates (meters) to a global GPS Location
+bool AC_DroneShowManager::convert_show_pos_to_location(const Vector3f &pos_m, Location &loc) const
+{
+    if (!_show_coordinate_system.is_valid()) {
+        return false;
+    }
+    
+    // Skybrush's sb_vector3_t uses float fields in millimeters
+    sb_vector3_t vec_mm;
+    vec_mm.x = pos_m.x * 1000.0f;
+    vec_mm.y = pos_m.y * 1000.0f;
+    vec_mm.z = pos_m.z * 1000.0f;
+    
+    _show_coordinate_system.convert_show_to_global_coordinate(vec_mm, loc);
+    return true;
+}
