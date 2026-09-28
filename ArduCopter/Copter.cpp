@@ -250,6 +250,10 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #ifdef USERHOOK_50HZLOOP
     SCHED_TASK(userhook_50Hz,         50,     75, 156),
 #endif
+#if MODE_DRONE_SHOW_ENABLED
+    // fires the deferred switch to QRBOTS_RTL once the show clock reaches the requested time
+    SCHED_TASK_CLASS(ModeQRBotsRTL,       &copter.mode_qrbots_rtl,     check_pending,   50, 100, 157),
+#endif
 #ifdef USERHOOK_MEDIUMLOOP
     SCHED_TASK(userhook_MediumLoop,   10,     75, 159),
 #endif

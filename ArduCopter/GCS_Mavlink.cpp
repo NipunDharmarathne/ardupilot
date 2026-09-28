@@ -839,11 +839,22 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_int_packet(const mavlink_command_i
         return MAV_RESULT_ACCEPTED;
 
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:
-        if (!copter.set_mode(Mode::Number::QRBOTS_RTL, ModeReason::GCS_COMMAND)) {
-            return MAV_RESULT_FAILED;
-        }
-        return MAV_RESULT_ACCEPTED;
+        // param1 contains target return-to-home show time in seconds
+        {
+            // Reject negative/NaN values before the unsigned cast
+            if (!(packet.param1 >= 0.0f)) {
+                return MAV_RESULT_DENIED;
+            }
 
+            const uint32_t target_show_time_ms = (uint32_t)packet.param1 * 1000U;
+
+            // Latch the request only. The drone keeps flying the native show, and
+            // check_pending() switches to QRBOTS_RTL when the show clock reaches the target.
+            return copter.mode_qrbots_rtl.request(target_show_time_ms)
+                       ? MAV_RESULT_ACCEPTED
+                       : MAV_RESULT_FAILED;
+        }
+        
     case MAV_CMD_NAV_VTOL_LAND:
     case MAV_CMD_NAV_LAND:
         if (!copter.set_mode(Mode::Number::LAND, ModeReason::GCS_COMMAND)) {
