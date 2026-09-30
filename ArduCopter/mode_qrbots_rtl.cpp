@@ -132,17 +132,53 @@ void ModeQRBotsRTL::hold_position()
     pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0f, false);
 }
 
-// Desired state on the straight line at time t since the start of the flight
-void ModeQRBotsRTL::run_trajectory(float t_s, Vector3p &pos_cm, Vector3f &vel_cms) const
+// Trapezoidal (or triangular on short legs) velocity profile along the straight line:
+//   accel phase  : 0 .. _ramp_time_s
+//   cruise phase : at _cruise_cms (== V_i on normal legs)
+//   decel phase  : last _ramp_time_s
+// Returns position, velocity and acceleration feed-forward at time t_s.
+void ModeQRBotsRTL::run_trajectory(float t_s, Vector3p &pos_cm, Vector3f &vel_cms, Vector3f &acc_cmss) const
 {
-    if (t_s >= _flight_time_s) {
-        pos_cm = _end_pos_cm;
-        vel_cms.zero();
+    float s, v, a;
+
+    if (t_s <= 0.0f) {
+        s = 0.0f;
+        v = 0.0f;
+        a = _accel_cmss;
+    } else if (t_s < _ramp_time_s) {
+        s = 0.5f * _accel_cmss * t_s * t_s;
+        v = _accel_cmss * t_s;
+        a = _accel_cmss;
+    } else if (t_s < _flight_time_s - _ramp_time_s) {
+        s = _ramp_dist_cm + _cruise_cms * (t_s - _ramp_time_s);
+        v = _cruise_cms;
+        a = 0.0f;
+    } else if (t_s < _flight_time_s) {
+        const float t_left = _flight_time_s - t_s;
+        s = _path_len_cm - 0.5f * _accel_cmss * t_left * t_left;
+        v = _accel_cmss * t_left;
+        a = -_accel_cmss;
     } else {
-        const float s = _speed_cms * MAX(t_s, 0.0f);     // distance along the line [cm]
-        pos_cm = _start_pos_cm + (_dir * s).topostype();
-        vel_cms = _dir * _speed_cms;
+        s = _path_len_cm;
+        v = 0.0f;
+        a = 0.0f;
     }
+
+    pos_cm   = _start_pos_cm + (_dir * s).topostype();
+    vel_cms  = _dir * v;
+    acc_cmss = _dir * a;
+}
+
+// Safety exit: hold at the current position (or the last commanded point if
+// position is unavailable) and hand over to LAND through the normal path.
+void ModeQRBotsRTL::abort_to_land(const char *reason, const Vector3f &cur_neu_cm, bool have_pos)
+{
+    if (have_pos) {
+        _hold_pos_cm = cur_neu_cm.topostype();
+    }
+    _state = State::EXECUTE_LAND;
+    gcs().send_text(MAV_SEVERITY_CRITICAL,
+        "[%lu ms] QRBots RTL ABORT: %s, EXECUTE_LAND", (unsigned long)AP_HAL::millis(), reason);
 }
 
 void ModeQRBotsRTL::restore_position_limits()
@@ -200,6 +236,7 @@ bool ModeQRBotsRTL::init(bool ignore_checks)
 
     _wait_start_ms = now_ms;
     _last_land_retry_ms = 0;
+    _err_active = false;
     _state = State::WAITING_5S;
 
     // Position controller: static hold at the current position
@@ -272,23 +309,38 @@ void ModeQRBotsRTL::run()
                 _end_pos_cm   = target_neu_cm.topostype();
 
                 const Vector3f delta = (_end_pos_cm - _start_pos_cm).tofloat();
-                const float dist_cm = delta.length();
+                _path_len_cm = delta.length();
 
-                if (dist_cm < 1.0f) {
+                if (_path_len_cm < 1.0f) {
                     // Already at the target
                     _state = State::EXECUTE_LAND;
                     gcs().send_text(MAV_SEVERITY_INFO,
                         "[%lu ms] QRBots RTL: already at target, EXECUTE_LAND", (unsigned long)now_ms);
                 } else {
-                    _dir = delta / dist_cm;
-                    _speed_cms = target_vel_ms * 100.0f;              // V_i
-                    _flight_time_s = dist_cm / _speed_cms;
-                    _fly_start_ms = now_ms;
+                    _dir = delta / _path_len_cm;
 
-                    // Make sure the shaper never clips the commanded V_i.
-                    // Split into horizontal / vertical components (10% headroom).
-                    const float vxy = MAX(Vector2f(_dir.x, _dir.y).length() * _speed_cms, 50.0f) * 1.1f;
-                    const float vz  = MAX(fabsf(_dir.z) * _speed_cms, 50.0f) * 1.1f;
+                    // ---- Trapezoidal profile parameters ----
+                    const float v_i = target_vel_ms * 100.0f;                        // V_i [cm/s]
+                    _accel_cmss = MAX(MIN(wp_nav->get_wp_acceleration(), MAX_PROFILE_ACCEL_CMSS), 10.0f);
+
+                    if (_path_len_cm >= v_i * v_i / _accel_cmss) {
+                        // Full trapezoid: accel -> cruise at exactly V_i -> decel
+                        _cruise_cms = v_i;
+                        _flight_time_s = _path_len_cm / v_i + v_i / _accel_cmss;
+                    } else {
+                        // Short leg: triangular profile with a lower peak speed
+                        _cruise_cms = sqrtf(_accel_cmss * _path_len_cm);
+                        _flight_time_s = 2.0f * _cruise_cms / _accel_cmss;
+                    }
+                    _ramp_time_s = _cruise_cms / _accel_cmss;
+                    _ramp_dist_cm = 0.5f * _accel_cmss * _ramp_time_s * _ramp_time_s;
+                    _fly_start_ms = now_ms;
+                    _err_active = false;
+
+                    // Make sure the shaper never clips the commanded speed.
+                    // Split into horizontal / vertical components (with headroom).
+                    const float vxy = MAX(Vector2f(_dir.x, _dir.y).length() * _cruise_cms, MIN_LIMIT_SPEED_CMS) * LIMIT_HEADROOM;
+                    const float vz  = MAX(fabsf(_dir.z) * _cruise_cms, MIN_LIMIT_SPEED_CMS) * LIMIT_HEADROOM;
                     pos_control->set_max_speed_accel_xy(vxy, wp_nav->get_wp_acceleration());
                     pos_control->set_correction_speed_accel_xy(vxy, wp_nav->get_wp_acceleration());
                     pos_control->set_max_speed_accel_z(-vz, vz, wp_nav->get_accel_z());
@@ -297,8 +349,10 @@ void ModeQRBotsRTL::run()
 
                     _state = State::FLY_TO_TARGET;
                     gcs().send_text(MAV_SEVERITY_INFO,
-                        "[%lu ms] QRBots RTL State: FLY_TO_TARGET dist=%.1f m V=%.2f m/s T=%.1f s",
-                        (unsigned long)now_ms, (double)(dist_cm * 0.01f), (double)target_vel_ms, (double)_flight_time_s);
+                        "[%lu ms] QRBots RTL State: FLY_TO_TARGET dist=%.1f m Vcruise=%.2f m/s a=%.2f m/s2 T=%.1f s",
+                        (unsigned long)now_ms,
+                        (double)(_path_len_cm * 0.01f), (double)(_cruise_cms * 0.01f),
+                        (double)(_accel_cmss * 0.01f), (double)_flight_time_s);
                 }
             } else {
                 _state = State::EXECUTE_LAND;
@@ -314,36 +368,64 @@ void ModeQRBotsRTL::run()
 
         Vector3p pos_cm;
         Vector3f vel_cms;
-        run_trajectory(t_s, pos_cm, vel_cms);
+        Vector3f acc_cmss;
+        run_trajectory(t_s, pos_cm, vel_cms, acc_cmss);
 
-        Vector2p pos_xy = pos_cm.xy();
-        Vector2f vel_xy = vel_cms.xy();
-        Vector2f acc_xy;                         // constant velocity -> zero feed-forward accel
-        float pos_z = pos_cm.z;
-        float vel_z = vel_cms.z;
+        // --- Safety guards (evaluated every loop while following the schedule) ---
+        Vector3f cur_neu_cm;
+        const bool have_pos = get_current_pos_neu_cm(cur_neu_cm);
+        bool aborted = false;
 
-        // limit_output = false: follow the schedule strictly
-        pos_control->input_pos_vel_accel_xy(pos_xy, vel_xy, acc_xy, false);
-        pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0f, false);
+        if (!have_pos) {
+            // Lost the position estimate: stop following a moving schedule
+            abort_to_land("position estimate lost", cur_neu_cm, false);
+            aborted = true;
+        } else {
+            const float track_err_cm = (cur_neu_cm - pos_cm.tofloat()).length();
 
-        _hold_pos_cm = pos_cm;                   // a LAND retry holds the last commanded point
-
-        // Arrived: schedule finished AND physically close (or safety timeout)
-        if (t_s >= _flight_time_s) {
-            Vector3f cur_neu_cm;
-            float err_cm = 1e9f;
-            if (get_current_pos_neu_cm(cur_neu_cm)) {
-                err_cm = (cur_neu_cm - _end_pos_cm.tofloat()).length();
+            if (track_err_cm > MAX_TRACK_ERR_CM) {
+                if (!_err_active) {
+                    _err_active = true;
+                    _err_start_ms = now_ms;
+                    gcs().send_text(MAV_SEVERITY_WARNING,
+                        "[%lu ms] QRBots RTL: tracking error %.1f m", (unsigned long)now_ms, (double)(track_err_cm * 0.01f));
+                } else if (now_ms - _err_start_ms >= MAX_TRACK_ERR_TIME_MS) {
+                    abort_to_land("tracking error too large", cur_neu_cm, true);
+                    aborted = true;
+                }
+            } else {
+                _err_active = false;
             }
-            if (err_cm < 50.0f || t_s > _flight_time_s + 10.0f) {
-                _state = State::EXECUTE_LAND;
-                gcs().send_text(MAV_SEVERITY_INFO,
-                    "[%lu ms] QRBots RTL State: EXECUTE_LAND (err=%.0f cm)",
-                    (unsigned long)now_ms, (double)err_cm);
+        }
+
+        if (aborted) {
+            hold_position();   // hold the current point this loop; LAND handoff happens next loop
+        } else {
+            Vector2p pos_xy = pos_cm.xy();
+            Vector2f vel_xy = vel_cms.xy();
+            Vector2f acc_xy = acc_cmss.xy();
+            float pos_z = pos_cm.z;
+            float vel_z = vel_cms.z;
+
+            // limit_output = false: follow the schedule strictly
+            pos_control->input_pos_vel_accel_xy(pos_xy, vel_xy, acc_xy, false);
+            pos_control->input_pos_vel_accel_z(pos_z, vel_z, acc_cmss.z, false);
+
+            _hold_pos_cm = pos_cm;   // a LAND retry holds the last commanded point
+
+            // Arrived: schedule finished AND physically close (or safety timeout)
+            if (t_s >= _flight_time_s) {
+                const float err_cm = (cur_neu_cm - _end_pos_cm.tofloat()).length();
+                if (err_cm < ARRIVAL_RADIUS_CM || t_s > _flight_time_s + ARRIVAL_TIMEOUT_S) {
+                    _state = State::EXECUTE_LAND;
+                    gcs().send_text(MAV_SEVERITY_INFO,
+                        "[%lu ms] QRBots RTL State: EXECUTE_LAND (err=%.0f cm)",
+                        (unsigned long)now_ms, (double)err_cm);
+                }
             }
         }
     } else {
-        hold_position();                         // WAITING_5S and LAND-retry hold
+        hold_position();   // WAITING_5S and LAND-retry hold
     }
 
     // --- 4. Position controller update ---
