@@ -226,12 +226,12 @@ bool ModeQRBotsRTL::init(bool ignore_checks)
         (long)current_show_time_ms);
 
     if (current_show_time_ms < (int32_t)_target_show_time_ms) {
-        // Only happens if the mode was selected directly (not via request()).
-        // A direct selection is an explicit override, so the sequence starts now.
-        gcs().send_text(MAV_SEVERITY_WARNING,
-            "[%lu ms] QRBots RTL Init: entered %ld ms before target show time, starting immediately",
+        gcs().send_text(MAV_SEVERITY_ERROR,
+            "[%lu ms] QRBots RTL Init REJECTED: Target show time not reached (%ld < %lu ms)",
             (unsigned long)now_ms,
-            (long)((int32_t)_target_show_time_ms - current_show_time_ms));
+            (long)current_show_time_ms,
+            (unsigned long)_target_show_time_ms);
+        return false; // Blocks early manual entry completely
     }
 
     _wait_start_ms = now_ms;
@@ -294,10 +294,12 @@ void ModeQRBotsRTL::run()
 
             if (ok) {
                 // get_qrbots_rth_target returns SHOW coordinates, so convert_show_pos_to_location IS correct here
-                if (!copter.g2.drone_show_manager.convert_show_pos_to_location(target_pos_m, target_loc)) {
-                    target_loc = ahrs.get_home();
-                    target_loc.offset(target_pos_m.x, target_pos_m.y);
-                    target_loc.set_alt_cm((int32_t)(target_pos_m.z * 100.0f), Location::AltFrame::ABOVE_HOME);
+                if (!copter.g2.drone_show_manager.convert_show_pos_to_location(target_pos_m, target_loc)) {   //NEED TO FIX
+                    gcs().send_text(MAV_SEVERITY_CRITICAL,
+                            "[%lu ms] QRBots RTL ABORT: Failed to convert show pos to location",
+                            (unsigned long)now_ms);
+                        _state = State::EXECUTE_LAND; // Immediately switch to LAND in place
+                        return;
                 }
                 ok = target_loc.get_vector_from_origin_NEU(target_neu_cm) &&   // cm
                      get_current_pos_neu_cm(cur_neu_cm) &&
@@ -311,7 +313,7 @@ void ModeQRBotsRTL::run()
                 const Vector3f delta = (_end_pos_cm - _start_pos_cm).tofloat();
                 _path_len_cm = delta.length();
 
-                if (_path_len_cm < 1.0f) {
+                if (_path_len_cm < 1.0f) {             //NEED TO FIX. ALL SHOULD LNAD IN SAME TIME. ELSE COLLISIONS CAN OCCUR. 
                     // Already at the target
                     _state = State::EXECUTE_LAND;
                     gcs().send_text(MAV_SEVERITY_INFO,
