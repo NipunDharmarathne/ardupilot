@@ -9,6 +9,13 @@ git checkout CMCopter-4.6
 git submodule sync
 git submodule update --init --recursive --force
 
+# How to build for QTSM
+
+Run in WSL terminal:
+./waf clean
+./waf configure --board QSTM
+./waf copter --upload
+
 # How to build SITL
 
 Run in WSL terminal:
