@@ -810,7 +810,7 @@ bool AC_DroneShowManager::get_qrbots_rth_target(uint32_t time_ms, Vector3f &pos_
 
 
     // Basic debug to show we entered the function
-    gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: Requesting target for %u ms", time_ms);
+    gcs().send_text(MAV_SEVERITY_WARNING, "RTH Debug: Requesting target for %lu ms", (unsigned long)time_ms);
 
     sb_vector3_t sb_pos;
     if (sb_qrbots_rth_plan_get_target_at(&_main_show_scene.qrbots_rth_plan, time_ms, &sb_pos, &vel_m_s)) {

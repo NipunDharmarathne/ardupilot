@@ -1,6 +1,8 @@
 #include "Copter.h"
 #include "mode_qrbots_rtl.h"
 
+constexpr float ModeQRBotsRTL::MAX_PROFILE_ACCEL_CMSS;
+
 // ---------------------------------------------------------------------------
 // Scheduled RTL request
 //

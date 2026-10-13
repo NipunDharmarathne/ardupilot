@@ -8,6 +8,7 @@
 #include "AC_DroneShowManager.h"
 #include "DroneShow_Constants.h"
 #include "skybrush/rth_plan.h"
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL &hal;
 
@@ -200,7 +201,7 @@ bool AC_DroneShowManager::_load_show_file_from_storage()
             sb_screenplay_scene_t* first_scene = sb_screenplay_get_scene_ptr(&_screenplay, 0);
             if (first_scene != nullptr) {
                 // 1. Send a short summary to Mission Planner / MAVProxy
-                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "QRBots Plan Loaded! Scale: %.1f, Entries: %u", 
+                gcs().send_text(MAV_SEVERITY_INFO, "QRBots Plan Loaded! Scale: %.1f, Entries: %u", 
                               (double)first_scene->qrbots_rth_plan.scale, 
                               (unsigned int)first_scene->qrbots_rth_plan.num_entries);
 
