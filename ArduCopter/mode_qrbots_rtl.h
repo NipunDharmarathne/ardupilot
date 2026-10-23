@@ -41,10 +41,11 @@ private:
     };
 
     // ---- Tunables (start conservative, raise only after checking logs) ----
-    static constexpr float    MAX_PROFILE_ACCEL_CMSS   = 100.0f;   // cap on ramp up/down acceleration [cm/s^2]
-    static constexpr float    LIMIT_HEADROOM           = 1.1f;     // pos_control speed-limit margin over cruise speed
-    static constexpr float    MIN_LIMIT_SPEED_CMS      = 50.0f;    // lower bound for pos_control speed limits
-    static constexpr float    ARRIVAL_RADIUS_CM        = 50.0f;    // "arrived" distance to the end point
+    // static constexpr float    MAX_PROFILE_ACCEL_CMSS   = 100.0f;   // cap on ramp up/down acceleration [cm/s^2]
+    // static constexpr float    LIMIT_HEADROOM           = 1.1f;     // pos_control speed-limit margin over cruise speed
+    // static constexpr float    MIN_LIMIT_SPEED_CMS      = 50.0f;    // lower bound for pos_control speed limits
+    
+    static constexpr float    ARRIVAL_RADIUS_CM        = 20.0f;    // "arrived" distance to the end point
     static constexpr float    ARRIVAL_TIMEOUT_S        = 10.0f;    // give up waiting for arrival after schedule end
     static constexpr float    MAX_TRACK_ERR_CM         = 300.0f;   // tracking error that triggers the abort timer
     static constexpr uint32_t MAX_TRACK_ERR_TIME_MS    = 1000;     // how long the error must persist before aborting
@@ -83,7 +84,8 @@ private:
     float          _ramp_dist_cm = 0.0f;  // distance covered during accel (and decel) phase
     float          _flight_time_s = 0.0f; // total duration of the profile
     uint32_t       _fly_start_ms = 0;
-    bool           _limits_modified = false;
+
+    // bool           _limits_modified = false;
 
     // --- tracking-error guard ---
     bool           _err_active = false;
