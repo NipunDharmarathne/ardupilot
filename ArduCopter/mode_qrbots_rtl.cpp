@@ -1,7 +1,7 @@
 #include "Copter.h"
 #include "mode_qrbots_rtl.h"
 
-// constexpr float ModeQRBotsRTL::MAX_PROFILE_ACCEL_CMSS;
+constexpr float ModeQRBotsRTL::MAX_PROFILE_ACCEL_CMSS;
 
 // ---------------------------------------------------------------------------
 // Scheduled RTL request
@@ -183,17 +183,6 @@ void ModeQRBotsRTL::abort_to_land(const char *reason, const Vector3f &cur_neu_cm
         "[%lu ms] QRBots RTL ABORT: %s, EXECUTE_LAND", (unsigned long)AP_HAL::millis(), reason);
 }
 
-// void ModeQRBotsRTL::restore_position_limits()
-// {
-//     if (!_limits_modified) {
-//         return;
-//     }
-//     pos_control->set_max_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-//     pos_control->set_correction_speed_accel_xy(wp_nav->get_default_speed_xy(), wp_nav->get_wp_acceleration());
-//     pos_control->set_max_speed_accel_z(-wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
-//     pos_control->set_correction_speed_accel_z(-wp_nav->get_default_speed_down(), wp_nav->get_default_speed_up(), wp_nav->get_accel_z());
-//     _limits_modified = false;
-// }
 
 // ---------------------------------------------------------------------------
 // Mode
@@ -326,7 +315,9 @@ void ModeQRBotsRTL::run()
                     // ---- Trapezoidal profile parameters ----
                     const float v_i = target_vel_ms * 100.0f;                        // V_i [cm/s]
                     // _accel_cmss = MAX(MIN(wp_nav->get_wp_acceleration(), MAX_PROFILE_ACCEL_CMSS), 10.0f);
-                    _accel_cmss = wp_nav->get_wp_acceleration();
+                    // _accel_cmss = wp_nav->get_wp_acceleration();
+                    _accel_cmss = MAX_PROFILE_ACCEL_CMSS;
+                    
 
                     if (_path_len_cm >= v_i * v_i / _accel_cmss) {
                         // Full trapezoid: accel -> cruise at exactly V_i -> decel
@@ -342,15 +333,6 @@ void ModeQRBotsRTL::run()
                     _fly_start_ms = now_ms;
                     _err_active = false;
 
-                    // // Make sure the shaper never clips the commanded speed.
-                    // // Split into horizontal / vertical components (with headroom).
-                    // const float vxy = MAX(Vector2f(_dir.x, _dir.y).length() * _cruise_cms, MIN_LIMIT_SPEED_CMS) * LIMIT_HEADROOM;
-                    // const float vz  = MAX(fabsf(_dir.z) * _cruise_cms, MIN_LIMIT_SPEED_CMS) * LIMIT_HEADROOM;
-                    // pos_control->set_max_speed_accel_xy(vxy, wp_nav->get_wp_acceleration());
-                    // pos_control->set_correction_speed_accel_xy(vxy, wp_nav->get_wp_acceleration());
-                    // pos_control->set_max_speed_accel_z(-vz, vz, wp_nav->get_accel_z());
-                    // pos_control->set_correction_speed_accel_z(-vz, vz, wp_nav->get_accel_z());
-                    // _limits_modified = true;
 
                     _state = State::FLY_TO_TARGET;
                     gcs().send_text(MAV_SEVERITY_INFO,
