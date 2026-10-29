@@ -130,8 +130,8 @@ void ModeQRBotsRTL::hold_position()
     float pos_z = _hold_pos_cm.z;
     float vel_z = 0.0f;
 
-    pos_control->input_pos_vel_accel_xy(pos_xy, vel_xy, acc_xy, false);
-    pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0f, false);
+    pos_control->input_pos_vel_accel_xy(pos_xy, vel_xy, acc_xy, true);
+    pos_control->input_pos_vel_accel_z(pos_z, vel_z, 0.0f, true);
 }
 
 // Trapezoidal (or triangular on short legs) velocity profile along the straight line:
