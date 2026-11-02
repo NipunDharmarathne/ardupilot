@@ -171,17 +171,6 @@ void ModeQRBotsRTL::run_trajectory(float t_s, Vector3p &pos_cm, Vector3f &vel_cm
     acc_cmss = _dir * a;
 }
 
-// Safety exit: hold at the current position (or the last commanded point if
-// position is unavailable) and hand over to LAND through the normal path.
-void ModeQRBotsRTL::abort_to_land(const char *reason, const Vector3f &cur_neu_cm, bool have_pos)
-{
-    if (have_pos) {
-        _hold_pos_cm = cur_neu_cm.topostype();
-    }
-    _state = State::EXECUTE_LAND;
-    gcs().send_text(MAV_SEVERITY_CRITICAL,
-        "[%lu ms] QRBots RTL ABORT: %s, EXECUTE_LAND", (unsigned long)AP_HAL::millis(), reason);
-}
 
 
 // ---------------------------------------------------------------------------
@@ -227,7 +216,6 @@ bool ModeQRBotsRTL::init(bool ignore_checks)
 
     _wait_start_ms = now_ms;
     _last_land_retry_ms = 0;
-    _err_active = false;
     _state = State::WAITING_5S;
 
     // Position controller: static hold at the current position
@@ -331,7 +319,6 @@ void ModeQRBotsRTL::run()
                     _ramp_time_s = _cruise_cms / _accel_cmss;
                     _ramp_dist_cm = 0.5f * _accel_cmss * _ramp_time_s * _ramp_time_s;
                     _fly_start_ms = now_ms;
-                    _err_active = false;
 
 
                     _state = State::FLY_TO_TARGET;
@@ -360,34 +347,11 @@ void ModeQRBotsRTL::run()
 
         // --- Safety guards (evaluated every loop while following the schedule) ---
         Vector3f cur_neu_cm;
-        const bool have_pos = get_current_pos_neu_cm(cur_neu_cm);
-        bool aborted = false;
+        get_current_pos_neu_cm(cur_neu_cm);
 
-        if (!have_pos) {
-            // Lost the position estimate: stop following a moving schedule
-            abort_to_land("position estimate lost", cur_neu_cm, false);
-            aborted = true;
-        } else {
-            const float track_err_cm = (cur_neu_cm - pos_cm.tofloat()).length();
 
-            if (track_err_cm > MAX_TRACK_ERR_CM) {
-                if (!_err_active) {
-                    _err_active = true;
-                    _err_start_ms = now_ms;
-                    gcs().send_text(MAV_SEVERITY_WARNING,
-                        "[%lu ms] QRBots RTL: tracking error %.1f m", (unsigned long)now_ms, (double)(track_err_cm * 0.01f));
-                } else if (now_ms - _err_start_ms >= MAX_TRACK_ERR_TIME_MS) {
-                    abort_to_land("tracking error too large", cur_neu_cm, true);
-                    aborted = true;
-                }
-            } else {
-                _err_active = false;
-            }
-        }
 
-        if (aborted) {
-            hold_position();   // hold the current point this loop; LAND handoff happens next loop
-        } else {
+
             Vector2p pos_xy = pos_cm.xy();
             Vector2f vel_xy = vel_cms.xy();
             Vector2f acc_xy = acc_cmss.xy();
@@ -410,7 +374,7 @@ void ModeQRBotsRTL::run()
                         (unsigned long)now_ms, (double)err_cm);
                 }
             }
-        }
+        
     } else {
         hold_position();   // WAITING_5S and LAND-retry hold
     }

@@ -45,8 +45,6 @@ private:
 
     static constexpr float    ARRIVAL_RADIUS_CM        = 20.0f;    // "arrived" distance to the end point
     static constexpr float    ARRIVAL_TIMEOUT_S        = 10.0f;    // give up waiting for arrival after schedule end
-    static constexpr float    MAX_TRACK_ERR_CM         = 300.0f;   // tracking error that triggers the abort timer
-    static constexpr uint32_t MAX_TRACK_ERR_TIME_MS    = 1000;     // how long the error must persist before aborting
 
     // --- helpers ---
     // Current position as NEU in cm from the EKF origin (same frame mode_guided gives pos_control)
@@ -55,11 +53,7 @@ private:
     void hold_position();
     // Desired state on the trapezoidal 1D profile along the straight line at time t_s
     void run_trajectory(float t_s, Vector3p &pos_cm, Vector3f &vel_cms, Vector3f &acc_cmss) const;
-    // Hold where we are and go to the LAND handoff (used by the safety guards)
-    void abort_to_land(const char *reason, const Vector3f &cur_neu_cm, bool have_pos);
-    // Restore pos_control limits to the waypoint-nav defaults
-    void restore_position_limits();
-
+    
     // --- scheduled request state ---
     bool           _pending = false;
     uint32_t       _target_show_time_ms = 0;
@@ -83,9 +77,4 @@ private:
     float          _flight_time_s = 0.0f; // total duration of the profile
     uint32_t       _fly_start_ms = 0;
 
-    // bool           _limits_modified = false;
-
-    // --- tracking-error guard ---
-    bool           _err_active = false;
-    uint32_t       _err_start_ms = 0;
 };
