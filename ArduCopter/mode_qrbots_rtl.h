@@ -1,8 +1,8 @@
 #pragma once
 
-// NOTE: reconstructed from the .cpp. Merge with your existing header if it
-// contains anything else (mode number enum entry, extra overrides, etc).
-// This header is expected to be included from mode.h, like the other Copter modes.
+#include "Copter.h"
+
+// NOTE: This header is expected to be included from mode.h, like the other Copter modes.
 
 class ModeQRBotsRTL : public Mode {
 
@@ -47,9 +47,9 @@ private:
     static constexpr float    ARRIVAL_TIMEOUT_S        = 10.0f;    // give up waiting for arrival after schedule end
 
     // --- helpers ---
-    // Current position as NEU in cm from the EKF origin (same frame mode_guided gives pos_control)
+    // Current position as NEU in cm from the EKF origin
     bool get_current_pos_neu_cm(Vector3f &pos_neu_cm) const;
-    // Command a static position hold at _hold_pos_cm
+    // Command a static position hold at _hold_pos_cm using guided mode
     void hold_position();
     // Desired state on the trapezoidal 1D profile along the straight line at time t_s
     void run_trajectory(float t_s, Vector3p &pos_cm, Vector3f &vel_cms, Vector3f &acc_cmss) const;
