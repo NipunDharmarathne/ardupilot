@@ -126,10 +126,13 @@ void ModeQRBotsRTL::hold_position()
 {
     Vector3f zero_vec{0.0f, 0.0f, 0.0f};
     
-    // Provide Guided mode with static NEU coordinates
+    // Provide Guided mode with static NEU coordinates and default show heading
     copter.mode_guided.set_destination_posvelaccel(
         _hold_pos_cm.tofloat(), zero_vec, zero_vec,
-        false, 0.0f, false, 0.0f
+        /* use_yaw = */ true, 
+        /* yaw_cd = */ copter.initial_armed_bearing, 
+        /* use_yaw_rate = */ false, 
+        /* yaw_rate_cds = */ 0.0f
     );
 }
 
@@ -344,26 +347,39 @@ void ModeQRBotsRTL::run()
         Vector3f acc_cmss;
         run_trajectory(t_s, pos_cm, vel_cms, acc_cmss);
 
-        // Feed trajectory to Guided mode in NEU coordinates (default layout for posvelaccel)
+        // Feed trajectory to Guided mode in NEU coordinates, locking the heading to the show front
         copter.mode_guided.set_destination_posvelaccel(
             pos_cm.tofloat(), vel_cms, acc_cmss,
-            false, 0.0f, false, 0.0f
+            /* use_yaw = */ true, 
+            /* yaw_cd = */ copter.initial_armed_bearing, 
+            /* use_yaw_rate = */ false, 
+            /* yaw_rate_cds = */ 0.0f
         );
 
         _hold_pos_cm = pos_cm;   // a LAND retry holds the last commanded point
 
         // --- Safety guards ---
         Vector3f cur_neu_cm;
-        get_current_pos_neu_cm(cur_neu_cm);
-
-        // Arrived: schedule finished AND physically close (or safety timeout)
-        if (t_s >= _flight_time_s) {
-            const float err_cm = (cur_neu_cm - _end_pos_cm.tofloat()).length();
-            if (err_cm < ARRIVAL_RADIUS_CM || t_s > _flight_time_s + ARRIVAL_TIMEOUT_S) {
-                _state = State::EXECUTE_LAND;
-                gcs().send_text(MAV_SEVERITY_INFO,
-                    "[%lu ms] QRBots RTL State: EXECUTE_LAND (err=%.0f cm)",
-                    (unsigned long)now_ms, (double)err_cm);
+        
+        // Check if we actively lost our position estimate (EKF failure / GPS loss)
+        if (!get_current_pos_neu_cm(cur_neu_cm)) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL,
+                "[%lu ms] QRBots RTL ABORT: Position estimate lost mid-flight!", 
+                (unsigned long)now_ms);
+            
+            // Immediately abort the trajectory and drop into the landing state
+            _state = State::EXECUTE_LAND;
+        } else {
+            // We have a valid position, so check if we have arrived
+            // Arrived: schedule finished AND physically close (or safety timeout)
+            if (t_s >= _flight_time_s) {
+                const float err_cm = (cur_neu_cm - _end_pos_cm.tofloat()).length();
+                if (err_cm < ARRIVAL_RADIUS_CM || t_s > _flight_time_s + ARRIVAL_TIMEOUT_S) {
+                    _state = State::EXECUTE_LAND;
+                    gcs().send_text(MAV_SEVERITY_INFO,
+                        "[%lu ms] QRBots RTL State: EXECUTE_LAND (err=%.0f cm)",
+                        (unsigned long)now_ms, (double)err_cm);
+                }
             }
         }
         
